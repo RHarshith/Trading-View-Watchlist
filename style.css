@@ -1,0 +1,23 @@
+.symbol-table tbody tr:hover{
+    background-color: #f0f3fa;
+  }
+  
+  .symbol-table tbody td {
+    position: relative;
+  }
+  
+  
+  .symbol-table .btn-close {
+    display: none;
+    position: absolute;
+    right: 50%;
+  }
+  
+  .symbol-table tr:hover .btn-close{
+    display: inline-block;
+  }
+
+  .watchlist-names {
+    max-height: 20vh;
+    overflow-y: scroll;
+  }

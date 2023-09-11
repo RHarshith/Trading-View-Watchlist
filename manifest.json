@@ -1,0 +1,14 @@
+{
+    "manifest_version": 3,
+
+    "name": "Such Activity",
+    "description": "Wow",
+    "version": "1.0",
+    "permissions": ["scripting", "activeTab", "storage"],
+    "host_permissions": ["<all_urls>"],
+
+    "action": {
+        "default_title": "Click Me",
+        "default_popup": "popup.html"
+    }
+}
