@@ -1,23 +1,72 @@
+* {
+  font-size: 12px;
+}
+
+/* body {
+  background-color: #f0f3fa;
+}
+
+body>div {
+  background-color: white;
+} */
 .symbol-table tbody tr:hover{
     background-color: #f0f3fa;
   }
-  
+
   .symbol-table tbody td {
     position: relative;
   }
-  
-  
+
+.table-container {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+.watchlist-submit {
+  font-size: 16px;
+}
+.watchlist-submit:hover {
+  background-color: #f0f3fa;
+}
   .symbol-table .btn-close {
     display: none;
     position: absolute;
     right: 50%;
   }
-  
+
   .symbol-table tr:hover .btn-close{
     display: inline-block;
   }
 
   .watchlist-names {
-    max-height: 20vh;
-    overflow-y: scroll;
+    max-height: 10rem;
+    overflow-y: auto;
   }
+
+  .symbol-table tr {
+    font-size: 12px;
+  }
+
+  .navbar {
+    font-size: 14px;
+  }
+
+  #navbarDropdownMenuLink:hover {
+    background-color: #f0f3fa;
+  }
+
+.watchlist-names li {
+  position: relative;
+}
+
+.watchlist-names li .btn-close{
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom:0;
+  margin:  auto 0;
+}
+
+.watchlist-names li:hover .btn-close{
+  display: block;
+}

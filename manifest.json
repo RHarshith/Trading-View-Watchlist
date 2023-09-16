@@ -1,14 +1,14 @@
 {
     "manifest_version": 3,
 
-    "name": "Such Activity",
-    "description": "Wow",
+    "name": "Trading View Watchlist",
+    "description": "Watchlist emulator for Trading View website",
     "version": "1.0",
     "permissions": ["scripting", "activeTab", "storage"],
     "host_permissions": ["<all_urls>"],
 
     "action": {
-        "default_title": "Click Me",
+        "default_title": "TV Watchlist",
         "default_popup": "popup.html"
     }
 }
