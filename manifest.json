@@ -10,5 +10,11 @@
     "action": {
         "default_title": "TV Watchlist",
         "default_popup": "popup.html"
-    }
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://in.tradingview.com/chart/*"],
+            "js": ["content_script.js"]
+        }
+    ]
 }
