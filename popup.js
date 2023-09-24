@@ -2,6 +2,20 @@ var selectedWatchlist = null;
 const WATCHLIST_KEY = 'watchlist_4c70dd20-2688-4a0f-bfc1-ff6a8eff097d';
 var watchlistNames = [];
 var symbolsInCurrentWatchlist = [];
+// define an observer instance
+var observer = new IntersectionObserver(onIntersection, {
+    root: null,   // default is the viewport
+    threshold: .5 // percentage of target's visible area. Triggers "onIntersection"
+  })
+
+chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+if (msg.livePrices != null) {
+    console.log('found live prices', msg.livePrices)
+    updateLivePrices(msg.livePrices)
+    sendResponse("done")
+}
+return true;
+});
 
 function initv2() {
     chrome.storage.local.get(WATCHLIST_KEY, function(res) {
@@ -94,20 +108,6 @@ function createTable(dataArray) {
     var tableBody = document.querySelector("#myTable tbody");
     for (var i = 0; i < dataArray.length; i++) {
         appendSymbolToTable(dataArray[i], tableBody);
-        // var row = document.createElement("tr");
-
-        // // Iterate through the object properties to populate the columns
-        // for (var key of ['Symbol', 'Last', 'Chg', 'ChgPercent']) {
-        //     var cell = document.createElement("td");
-        //     cell.textContent = dataArray[i][key];
-        //     row.appendChild(cell);
-        // }
-
-        // // Add a click event listener to each row with a closure
-
-        // row.addEventListener("click", rowClickHandler);
-
-        // tableBody.appendChild(row);
     }
 }
 
@@ -139,12 +139,12 @@ function clearTable(){
 function appendSymbolToTable(Symbol, tableBody) {
     // Create a table row (<tr> element)
     var tableRow = document.createElement('tr');
-
+    tableRow.setAttribute('data-name', Symbol);
     // Create a table header cell (<th> element) with the "scope" attribute
     var th = document.createElement('td');
     th.setAttribute('scope', 'row');
     th.textContent = Symbol;
-
+    observer.observe(th)
     // Create regular table cells (<td> elements) for the other columns
     var td1 = document.createElement('td');
     td1.textContent = '-';
@@ -259,6 +259,30 @@ function csvToJSON(csv) {
         result.push(obj);
     }
     console.log(result);
+}
+
+function onIntersection(entries, opts){
+    visible_entries = [];
+    entries.forEach(entry => {
+        if(entry.isIntersecting)
+            visible_entries.push(entry.target.textContent);
+    })
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+        chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: visible_entries}, function(response) {});
+    });
+  }
+
+function updateLivePrices(symbolList) {
+    // symbolElements = document.getElementById("symbolList").childNodes;
+    symbolList.forEach(symbol => {
+        console.log('symbol to search', symbol)
+        if (document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)){
+            row = document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)
+            row.children.item(1).textContent = symbol['last'];
+            row.children.item(2).textContent = symbol['change'];
+            row.children.item(3).textContent = symbol['changepct'];
+        }
+    })
 }
 
 initv2();
