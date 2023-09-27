@@ -3,41 +3,59 @@ const WATCHLIST_KEY = 'watchlist_4c70dd20-2688-4a0f-bfc1-ff6a8eff097d';
 var watchlistNames = [];
 var symbolsInCurrentWatchlist = [];
 // define an observer instance
-var observer = new IntersectionObserver(onIntersection, {
-    root: null,   // default is the viewport
-    threshold: .5 // percentage of target's visible area. Triggers "onIntersection"
-  })
+// var observer = new IntersectionObserver(onIntersection, {
+//     root: null,   // default is the viewport
+//     threshold: .5 // percentage of target's visible area. Triggers "onIntersection"
+//   })
 
-chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-if (msg.livePrices != null) {
-    console.log('found live prices', msg.livePrices)
-    updateLivePrices(msg.livePrices)
-    sendResponse("done")
-}
-return true;
-});
+// chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+// if (msg.livePrices != null) {
+//     console.log('found live prices', msg.livePrices)
+//     updateLivePrices(msg.livePrices)
+//     sendResponse("done")
+// }
+// return true;
+// });
 
 function initv2() {
     chrome.storage.local.get(WATCHLIST_KEY, function(res) {
         if (res.hasOwnProperty(WATCHLIST_KEY)) {
             watchlistNames = res[WATCHLIST_KEY];
             console.log("fetched all watchlists:", watchlistNames);
-            selectedWatchlist = watchlistNames[0];
-            setSelectedWatchlistButton(selectedWatchlist);
-            listWatchlists(watchlistNames);
-            init_watchlist(selectedWatchlist);
+            chrome.storage.local.get('selected_watchlist', function(res) {
+                if (res.hasOwnProperty('selected_watchlist')) {
+                    selectedWatchlist = res.selected_watchlist;
+                }
+                else {
+                    selectedWatchlist = watchlistNames[0];
+                    UpdateStorage('selected_watchlist', selectedWatchlist);
+                }
+                setSelectedWatchlistButton(selectedWatchlist);
+                listWatchlists(watchlistNames);
+                init_watchlist(selectedWatchlist);
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+                    chrome.tabs.sendMessage(tabs[0].id, {init: true}, function(response) {});
+                });
+            })
+
         }
         else {
             selectedWatchlist = 'watchlist';
+            UpdateStorage('selected_watchlist', selectedWatchlist);
+
             watchlistNames = ['watchlist'];
             listWatchlists(watchlistNames);
             init_watchlist(selectedWatchlist);
             UpdateStorage(WATCHLIST_KEY, watchlistNames);
+            chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+                chrome.tabs.sendMessage(tabs[0].id, {init: true}, function(response) {});
+            });
         }
 
     })
     document.getElementById("inputSubmit").addEventListener("click", addToArray);
     document.getElementById("createWatchlist").addEventListener("click", createWatchlist);
+
 }
 
 function setSelectedWatchlistButton(watchlistName) {
@@ -68,10 +86,14 @@ function createWatchlist() {
     var entryName = prompt("Enter watchlist name:");
     if (entryName) {
         selectedWatchlist = entryName;
+        UpdateStorage('selected_watchlist', selectedWatchlist);
         setSelectedWatchlistButton(selectedWatchlist);
         init_watchlist(selectedWatchlist);
         listWatchlists([entryName]);
         AddWatchlist(entryName);
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+            chrome.tabs.sendMessage(tabs[0].id, {update: true}, function(response) {});
+        });
     }
 }
 function AddWatchlist(watchlistName) {
@@ -139,12 +161,12 @@ function clearTable(){
 function appendSymbolToTable(Symbol, tableBody) {
     // Create a table row (<tr> element)
     var tableRow = document.createElement('tr');
-    tableRow.setAttribute('data-name', Symbol);
+    // tableRow.setAttribute('data-name', Symbol);
     // Create a table header cell (<th> element) with the "scope" attribute
     var th = document.createElement('td');
     th.setAttribute('scope', 'row');
     th.textContent = Symbol;
-    observer.observe(th)
+    // observer.observe(th)
     // Create regular table cells (<td> elements) for the other columns
     var td1 = document.createElement('td');
     td1.textContent = '-';
@@ -193,8 +215,13 @@ function appendToWatchlistNames(name, list){
     listItem.addEventListener("click", (event) => {
         console.log(event.target.textContent);
         selectedWatchlist = event.target.textContent;
+        UpdateStorage('selected_watchlist', selectedWatchlist);
+
         setSelectedWatchlistButton(selectedWatchlist);
         init_watchlist(event.target.textContent)
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+            chrome.tabs.sendMessage(tabs[0].id, {update: true}, function(response) {});
+        });
     });
     var closeButton = document.createElement('button');
     closeButton.setAttribute('type', 'button');
@@ -261,29 +288,29 @@ function csvToJSON(csv) {
     console.log(result);
 }
 
-function onIntersection(entries, opts){
-    visible_entries = [];
-    entries.forEach(entry => {
-        if(entry.isIntersecting)
-            visible_entries.push(entry.target.textContent);
-    })
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-        chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: visible_entries}, function(response) {});
-    });
-  }
+// function onIntersection(entries, opts){
+//     visible_entries = [];
+//     entries.forEach(entry => {
+//         if(entry.isIntersecting)
+//             visible_entries.push(entry.target.textContent);
+//     })
+//     chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+//         chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: visible_entries}, function(response) {});
+//     });
+//   }
 
-function updateLivePrices(symbolList) {
-    // symbolElements = document.getElementById("symbolList").childNodes;
-    symbolList.forEach(symbol => {
-        console.log('symbol to search', symbol)
-        if (document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)){
-            row = document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)
-            row.children.item(1).textContent = symbol['last'];
-            row.children.item(2).textContent = symbol['change'];
-            row.children.item(3).textContent = symbol['changepct'];
-        }
-    })
-}
+// function updateLivePrices(symbolList) {
+//     // symbolElements = document.getElementById("symbolList").childNodes;
+//     symbolList.forEach(symbol => {
+//         console.log('symbol to search', symbol)
+//         if (document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)){
+//             row = document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)
+//             row.children.item(1).textContent = symbol['last'];
+//             row.children.item(2).textContent = symbol['change'];
+//             row.children.item(3).textContent = symbol['changepct'];
+//         }
+//     })
+// }
 
 initv2();
 
