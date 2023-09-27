@@ -18,7 +18,7 @@ body>div {
   }
 
 .table-container {
-  max-height: 20rem;
+  max-height: 35rem;
   overflow-y: auto;
 }
 .watchlist-submit {
@@ -69,4 +69,21 @@ body>div {
 
 .watchlist-names li:hover .btn-close{
   display: block;
+}
+
+#symbolList tr td:nth-child(2),
+#symbolList tr td:nth-child(3),
+#symbolList tr td:nth-child(4),
+#myTable thead tr th:nth-child(2),
+#myTable thead tr th:nth-child(3),
+#myTable thead tr th:nth-child(4){
+  text-align: right;
+}
+
+.price_green {
+  color: #22ab94;
+}
+
+.price_red {
+  color: #f23645;
 }

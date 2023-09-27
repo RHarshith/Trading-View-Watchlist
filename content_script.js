@@ -1,6 +1,6 @@
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     if (msg.visible_symbols != null) {
-      addSymbols(msg.visible_symbols)
+      clearWatchlist(msg.visible_symbols)
       sendResponse("done")
     }
     else if (msg.symbol != null)
@@ -72,7 +72,7 @@ async function handlePopup(symbol, query) {
 
 window.setInterval(
   sendLivePrices,
-  5000
+  1000
 )
 
 function sendLivePrices() {
@@ -91,7 +91,7 @@ function sendLivePrices() {
           dataList.push({symbol: symbolName, last: last, change: change, changepct: changepct})
         }
         catch(err){
-          console.log("wrong element", element);
+          // console.log("wrong element", element);
         }
       }
       )
@@ -101,3 +101,47 @@ function sendLivePrices() {
     livePrices: dataList
   });
 }
+
+async function clearWatchlist(symbols) {
+  symbols = symbols.map(str => {
+    if (!str.startsWith('NSE:')) {
+      return 'NSE:' + str;
+    }
+    return str;
+  });
+  nodes = document.querySelectorAll(".listContainer-MgF6KBas .symbol-RsFlttSS");
+  container = document.querySelector(".listContainer-MgF6KBas");
+  symbolElements = null;
+  if (container) symbolElements = container.firstChild;
+  if (symbolElements) console.log('total elements to clear',symbolElements.childNodes.length, nodes.length )
+  counter = 0;
+  if (symbolElements)
+    symbolElements.childNodes.forEach(child => {
+      try{
+      symbol = child.firstChild.firstChild.getAttribute('data-symbol-full');
+      if (symbols.includes(symbol)) symbols.splice(symbols.indexOf(symbol), 1);
+      }
+      catch(e){
+
+      }
+    })
+  console.log('new symbols to be added', symbols)
+  if (!symbols.length) return;
+  while(symbolElements && symbolElements.childElementCount>2 && counter < symbols.length){
+    children = symbolElements.children;
+    index = children.length -2;
+    await delay(0.001);
+    symbolElement = children.item(index).firstChild.firstChild;
+    // console.log(symbolElement.getAttribute('data-symbol-full'));
+    symbolElement.children.item(7).firstChild.click();
+    container = document.querySelector(".listContainer-MgF6KBas");
+    // console.log(container);
+    symbolElements = null;
+    if (container) symbolElements = container.firstChild;
+    counter +=1
+  }
+  console.log('total cleared', counter)
+  addSymbols(symbols)
+}
+
+const delay = ms => new Promise(res => setTimeout(res, ms));

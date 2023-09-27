@@ -2,6 +2,7 @@ var selectedWatchlist = null;
 const WATCHLIST_KEY = 'watchlist_4c70dd20-2688-4a0f-bfc1-ff6a8eff097d';
 var watchlistNames = [];
 var symbolsInCurrentWatchlist = [];
+var timer = null;
 // define an observer instance
 var observer = new IntersectionObserver(onIntersection, {
     root: null,   // default is the viewport
@@ -10,7 +11,7 @@ var observer = new IntersectionObserver(onIntersection, {
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
 if (msg.livePrices != null) {
-    console.log('found live prices', msg.livePrices)
+    // console.log('found live prices', msg.livePrices)
     updateLivePrices(msg.livePrices)
     sendResponse("done")
 }
@@ -38,6 +39,7 @@ function initv2() {
     })
     document.getElementById("inputSubmit").addEventListener("click", addToArray);
     document.getElementById("createWatchlist").addEventListener("click", createWatchlist);
+    document.querySelector(".table-container").addEventListener("scroll", getVisibleElements);
 }
 
 function setSelectedWatchlistButton(watchlistName) {
@@ -59,6 +61,10 @@ function init_watchlist(watchlist_name) {
         if (res.hasOwnProperty(watchlist_name)) {
             symbolsInCurrentWatchlist = res[watchlist_name];
             createTable(symbolsInCurrentWatchlist);
+            if(symbolsInCurrentWatchlist.length)
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+                    chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: symbolsInCurrentWatchlist.slice(0,30)}, function(response) {});
+                });
         }
 
     })
@@ -144,7 +150,7 @@ function appendSymbolToTable(Symbol, tableBody) {
     var th = document.createElement('td');
     th.setAttribute('scope', 'row');
     th.textContent = Symbol;
-    observer.observe(th)
+    // observer.observe(th);
     // Create regular table cells (<td> elements) for the other columns
     var td1 = document.createElement('td');
     td1.textContent = '-';
@@ -191,7 +197,7 @@ function appendToWatchlistNames(name, list){
     anchor.setAttribute('href', '#');
     anchor.textContent = name;
     listItem.addEventListener("click", (event) => {
-        console.log(event.target.textContent);
+        // console.log(event.target.textContent);
         selectedWatchlist = event.target.textContent;
         setSelectedWatchlistButton(selectedWatchlist);
         init_watchlist(event.target.textContent)
@@ -275,15 +281,50 @@ function onIntersection(entries, opts){
 function updateLivePrices(symbolList) {
     // symbolElements = document.getElementById("symbolList").childNodes;
     symbolList.forEach(symbol => {
-        console.log('symbol to search', symbol)
+        // console.log('symbol to search', symbol)
         if (document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)){
             row = document.querySelector(`table#myTable tbody tr[data-name='${symbol['symbol']}'`)
+
             row.children.item(1).textContent = symbol['last'];
             row.children.item(2).textContent = symbol['change'];
             row.children.item(3).textContent = symbol['changepct'];
+            if (isNaN(parseInt(symbol['change'].charAt(0), 10))){
+                row.children.item(2).classList.remove('price_green');
+                row.children.item(2).classList.add('price_red');
+                row.children.item(3).classList.remove('price_green');
+                row.children.item(3).classList.add('price_red');
+            }
+            else{
+                row.children.item(2).classList.remove('price_red');
+                row.children.item(2).classList.add('price_green');
+                row.children.item(3).classList.remove('price_red');
+                row.children.item(3).classList.add('price_green');
+            }
         }
     })
 }
 
 initv2();
 
+
+function getVisibleElements( ) {
+    if(timer !== null) {
+        clearTimeout(timer);
+    }
+    timer = setTimeout(function() {
+        const allElements = document.querySelectorAll('#symbolList tr');
+        let elements = [];
+        allElements.forEach(function(node){
+            let clientRect = node.getBoundingClientRect();
+            if (!(window.innerHeight <= clientRect.top || (clientRect.top <= 0 && clientRect.bottom <= 0)) ) {
+            // console.log(node, node.children);
+            if (node.getAttribute('data-name') != null)
+                elements.push(node.getAttribute('data-name'));
+            }
+        });
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
+            chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: elements}, function(response) {});
+        });
+  }, 400);
+
+};
