@@ -2,39 +2,45 @@
   font-size: 12px;
 }
 
-/* body {
-  background-color: #f0f3fa;
-}
-
-body>div {
-  background-color: white;
-} */
-.symbol-table tbody tr:hover{
-    background-color: #f0f3fa;
-  }
 
   .symbol-table tbody td {
     position: relative;
   }
 
+  .symbol-table tbody tr:hover{
+    background-color: #f0f3fa;
+  }
+
 .table-container {
   max-height: 35rem;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .watchlist-submit {
-  font-size: 16px;
+  font-size: 20px;
+  height: 24px;
+  width: 24px;
+  justify-content: center;
+  font-family: 'Courier New';
+  font-weight: 100;
+  display: flex;
+  align-items: center;
 }
 .watchlist-submit:hover {
   background-color: #f0f3fa;
 }
   .symbol-table .btn-close {
-    display: none;
-    position: absolute;
-    right: 50%;
+    visibility: hidden;
+    /* position: absolute;
+    right: 50%; */
   }
 
   .symbol-table tr:hover .btn-close{
-    display: inline-block;
+    visibility: visible;
+    background-color: #f0f3fa;
+  }
+  .symbol-table tr:hover .btn-close:hover{
+    background-color: #e4e6ed;
   }
 
   .watchlist-names {
@@ -86,4 +92,29 @@ body>div {
 
 .price_red {
   color: #f23645;
+}
+
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: none;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #f0f3fa;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #e4e6ed;
+}
+
+
+.navbar div:nth-child(2) > div {
+  margin-left: 0.5rem;
 }

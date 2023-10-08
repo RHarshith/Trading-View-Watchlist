@@ -115,22 +115,22 @@ async function clearWatchlist(symbols) {
   if (container) symbolElements = container.firstChild;
   if (symbolElements) console.log('total elements to clear',symbolElements.childNodes.length, nodes.length )
   counter = 0;
-  if (symbolElements)
-    symbolElements.childNodes.forEach(child => {
-      try{
-      symbol = child.firstChild.firstChild.getAttribute('data-symbol-full');
-      if (symbols.includes(symbol)) symbols.splice(symbols.indexOf(symbol), 1);
-      }
-      catch(e){
+  // if (symbolElements)
+  //   symbolElements.childNodes.forEach(child => {
+  //     try{
+  //     symbol = child.firstChild.firstChild.getAttribute('data-symbol-full');
+  //     if (symbols.includes(symbol)) symbols.splice(symbols.indexOf(symbol), 1);
+  //     }
+  //     catch(e){
 
-      }
-    })
-  console.log('new symbols to be added', symbols)
-  if (!symbols.length) return;
-  while(symbolElements && symbolElements.childElementCount>2 && counter < symbols.length){
+  //     }
+  //   })
+  // console.log('new symbols to be added', symbols)
+  // if (!symbols.length) return;
+  while(symbolElements && symbolElements.childElementCount>2){
     children = symbolElements.children;
     index = children.length -2;
-    await delay(0.001);
+    // await delay(0.001);
     symbolElement = children.item(index).firstChild.firstChild;
     // console.log(symbolElement.getAttribute('data-symbol-full'));
     symbolElement.children.item(7).firstChild.click();

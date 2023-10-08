@@ -29,7 +29,13 @@
           </div>
         </div>
         <div class="container d-flex justify-content-end">
-        <button class="btn btn-sm lead px-2 watchlist-submit float-end" type="submit" id="inputSubmit">+</button>
+          <div class="form-check form-switch mb-0">
+            <label class="form-check-label" for="toggleSort">Sort</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="toggleSort" checked>
+          </div>
+        <div>
+        <button class="btn btn-sm watchlist-submit" type="submit" id="inputSubmit">+</button>
+        </div>
         </div>
       </nav>
     <div class="table-container">
@@ -40,6 +46,7 @@
             <th scope="col">Last</th>
             <th scope="col">Chg</th>
             <th scope="col">Chg%</th>
+            <th scope="col"></th>
             <span>
           </tr>
         </thead>
