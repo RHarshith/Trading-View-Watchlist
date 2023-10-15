@@ -18,6 +18,21 @@
                 <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                   <li><a class="dropdown-item" id="createWatchlist" href="#">Create new</a></li>
                   <li><a class="dropdown-item" href="#">Import</a></li>
+                  <li>
+                    <h4>Live Price Method</h4>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="flexRadioDefault" id="pricemethod1" value=1>
+                      <label class="form-check-label" for="pricemethod1">
+                        On Scroll
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="flexRadioDefault" id="pricemethod2" value=2>
+                      <label class="form-check-label" for="pricemethod2">
+                        Round Robin
+                      </label>
+                    </div>
+                  </li>
                   <hr/>
                   <li>
                     <ul class="list-unstyled watchlist-names" id="entries">
@@ -31,7 +46,7 @@
         <div class="container d-flex justify-content-end">
           <div class="form-check form-switch mb-0">
             <label class="form-check-label" for="toggleSort">Sort</label>
-            <input class="form-check-input" type="checkbox" role="switch" id="toggleSort" checked>
+            <input class="form-check-input" type="checkbox" role="switch" id="toggleSort">
           </div>
         <div>
         <button class="btn btn-sm watchlist-submit" type="submit" id="inputSubmit">+</button>
@@ -54,7 +69,7 @@
         </tbody>
       </table>
     </div>
-    <script src="popup.js"></script>
+    <script src="entities.js"></script>
   </div>
 </body>
 </html>

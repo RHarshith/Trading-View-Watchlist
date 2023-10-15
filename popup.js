@@ -5,7 +5,7 @@ var watchlistNames = [];
 var symbolsInCurrentWatchlist = [];
 var timer = null;
 var sortPriceInterval = null;
-var sortPrices = true;
+var sortPrices = false;
 var currentIndex = 0;
 const BATCHSIZE = 10;
 var sortPricePeriod = 10000;
@@ -14,39 +14,41 @@ var sortPricePeriod = 10000;
 async function initv3() {
     document.getElementById("inputSubmit").addEventListener("click", addToArray);
     document.getElementById("createWatchlist").addEventListener("click", createWatchlist);
-    document.getElementById("toggleSort").addEventListener("click", toggleSort);
+    toggleSwitch = document.getElementById("toggleSort");
+    if (sortPrices) {
+        toggleSwitch.setAttribute("checked", "")
+    }
+    toggleSwitch.addEventListener("click", toggleSort);
 
     const storage_watchlist = await chrome.storage.local.get(WATCHLIST_KEY);
     watchlistNames = ['watchlist'];
-    if(
+    if (
         storage_watchlist.hasOwnProperty(WATCHLIST_KEY)
         && storage_watchlist[WATCHLIST_KEY].length > 0
-    ){
+    ) {
         watchlistNames = storage_watchlist[WATCHLIST_KEY];
     }
     else UpdateStorage(WATCHLIST_KEY, watchlistNames);
 
     selectedWatchlist = watchlistNames[0];
     const storage_selected_watchlist = await chrome.storage.local.get(SELECTED_WATCHLIST);
-    if(storage_selected_watchlist.hasOwnProperty(SELECTED_WATCHLIST)){
+    if (storage_selected_watchlist.hasOwnProperty(SELECTED_WATCHLIST)) {
         selectedWatchlist = storage_selected_watchlist[SELECTED_WATCHLIST]
     }
     else UpdateStorage(SELECTED_WATCHLIST, selectedWatchlist);
+    setSelectedWatchlistButton(selectedWatchlist);
     listWatchlists(watchlistNames);
     init_watchlist(selectedWatchlist);
-    chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+    chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
         if (msg.livePrices != null) {
             // console.log('found live prices', msg.livePrices)
             updateLivePrices(msg.livePrices)
             sendResponse("done")
         }
         return true;
-        });
-    sortPriceInterval = setInterval(
-        sendSymbolBatch,
-        sortPricePeriod,
-    )
-
+    });
+    sortPrices = !sortPrices;
+    toggleSort();
 }
 
 function toggleSort() {
@@ -55,12 +57,12 @@ function toggleSort() {
         document.querySelector(".table-container").addEventListener("scroll", getVisibleElements);
         clearInterval(sortPriceInterval);
     }
-    else{
+    else {
         sortPrices = true;
         document.querySelector(".table-container").removeEventListener("scroll", getVisibleElements);
         sortPriceInterval = setInterval(
             sendSymbolBatch,
-            sortPrivePeriod,
+            sortPricePeriod,
         )
     }
 
@@ -71,9 +73,9 @@ function setSelectedWatchlistButton(watchlistName) {
     watchlistButton.textContent = watchlistName;
 }
 
-function listWatchlists(watchlistNames){
+function listWatchlists(watchlistNames) {
     var entriesList = document.getElementById("entries");
-    for(var entryName of watchlistNames){
+    for (var entryName of watchlistNames) {
         appendToWatchlistNames(entryName, entriesList);
     }
 }
@@ -81,12 +83,12 @@ function listWatchlists(watchlistNames){
 function init_watchlist(watchlist_name) {
     clearTable();
     symbolsInCurrentWatchlist = []
-    chrome.storage.local.get(watchlist_name, function(res) {
+    chrome.storage.local.get(watchlist_name, function (res) {
         console.log("Symbols fetched from storage: ", res)
         if (res.hasOwnProperty(watchlist_name)) {
             symbolsInCurrentWatchlist = res[watchlist_name];
             createTable(symbolsInCurrentWatchlist);
-            if(symbolsInCurrentWatchlist.length)
+            if (symbolsInCurrentWatchlist.length)
                 getVisibleElements();
         }
 
@@ -111,16 +113,16 @@ function AddWatchlist(watchlistName) {
 function UpdateStorage(key, value) {
     obj = {}
     obj[key] = value;
-    chrome.storage.local.set(obj, function (){console.log("Updated storage:", key, value)});
+    chrome.storage.local.set(obj, function () { console.log("Updated storage:", key, value) });
 }
 function AddSymbolsToSelectedWatchlist(symbols) {
     symbolsInCurrentWatchlist = symbolsInCurrentWatchlist.concat(symbols);
-    symbolsInCurrentWatchlist = symbolsInCurrentWatchlist.filter(function(item, i, ar){ return ar.indexOf(item) === i; });
+    symbolsInCurrentWatchlist = symbolsInCurrentWatchlist.filter(function (item, i, ar) { return ar.indexOf(item) === i; });
     UpdateStorage(selectedWatchlist, symbolsInCurrentWatchlist);
 }
 function addToArray() {
     var inputField = prompt("Enter symbols (comma separated to add multiple symbols)");
-    if(inputField == null) inputField = "";
+    if (inputField == null) inputField = "";
     var inputValue = inputField.trim(); // Remove leading/trailing spaces
     if (inputValue !== "") {
         var values = inputValue.split(",");
@@ -128,13 +130,13 @@ function addToArray() {
             return value.trim()
         });
         values = values.filter(item => item !== "");
-        symbols = symbols.map(str => {
+        values = values.map(str => {
             str = str.replace(/\s+/g, '');
             if (!(str.startsWith('NSE:') || str.startsWith('BSE:'))) {
-              return 'NSE:' + str;
+                return 'NSE:' + str;
             }
             return str;
-          });
+        });
         createTable(values);
         AddSymbolsToSelectedWatchlist(values);
 
@@ -150,16 +152,19 @@ function createTable(dataArray) {
 
 
 function rowClickHandler(event) {
-  var clickedRow = event.target.closest('tr');
-  if (!clickedRow) return;
-  var symbol = clickedRow.cells[0].getAttribute('data-name');
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-        chrome.tabs.sendMessage(tabs[0].id, {symbol: symbol}, function(response) {});
+    console.log('clicked row');
+    var clickedRow = event.target.closest('tr');
+    console.log(clickedRow);
+    if (!clickedRow) return;
+    var symbol = clickedRow.getAttribute('data-name');
+    console.log(symbol);
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, { symbol: symbol }, function (response) { });
     });
 
 }
 
-function clearTable(){
+function clearTable() {
     var tableBody = document.querySelector("#myTable tbody");
     while (tableBody.firstChild) {
         tableBody.removeChild(tableBody.firstChild);
@@ -215,7 +220,7 @@ function appendSymbolToTable(Symbol, tableBody) {
 
 }
 
-function appendToWatchlistNames(name, list){
+function appendToWatchlistNames(name, list) {
     var listItem = document.createElement('li');
 
     // Create an anchor (<a> element) with the specified class and href
@@ -242,12 +247,12 @@ function appendToWatchlistNames(name, list){
     list.appendChild(listItem);
 }
 
-function deleteSymbolFromWatchlist(event){
+function deleteSymbolFromWatchlist(event) {
     var clickedRow = event.target.parentNode.parentNode; // Get the row of clicked button
     if (!clickedRow) return;
-    var symbol = clickedRow.cells[0].getAttribute('data-name');
+    var symbol = clickedRow.getAttribute('data-name');
     const index = symbolsInCurrentWatchlist.indexOf(symbol);
-    clickedRow.parentNode.removeChild( clickedRow );
+    clickedRow.parentNode.removeChild(clickedRow);
 
     if (index > -1) { // only splice array when item is found
         symbolsInCurrentWatchlist.splice(index, 1); // 2nd parameter means remove one item only
@@ -257,7 +262,7 @@ function deleteSymbolFromWatchlist(event){
 
 }
 
-function deleteWatchlist(event){
+function deleteWatchlist(event) {
     var clickedRow = event.target.parentNode; // Get the row of clicked button
     if (!clickedRow) return;
     var symbol = clickedRow.firstChild.textContent;
@@ -288,12 +293,12 @@ function csvToJSON(csv) {
     for (var i = 1; i < lines.length; i++) {
         var obj = {};
 
-        if(lines[i] == undefined || lines[i].trim() == "") {
+        if (lines[i] == undefined || lines[i].trim() == "") {
             continue;
         }
 
         var words = lines[i].split(",");
-        for(var j = 0; j < words.length; j++) {
+        for (var j = 0; j < words.length; j++) {
             obj[headers[j].trim()] = words[j];
         }
 
@@ -305,12 +310,12 @@ function csvToJSON(csv) {
 function updateLivePrices(symbolList) {
     tableBody = document.getElementById("symbolList");
     symbolList = symbolList.map(symbol => {
-        if (isNaN(parseInt(symbol['change'].charAt(0), 10))){
+        if (isNaN(parseInt(symbol['change'].charAt(0), 10))) {
             // console.log()
             symbol['change'] = parseFloat(symbol['change'].slice(1)) * -1
             symbol['changepct'] = parseFloat(symbol['changepct'].slice(1)) * -1
         }
-        else{
+        else {
             symbol['change'] = parseFloat(symbol['change'])
             symbol['changepct'] = parseFloat(symbol['changepct'])
         }
@@ -318,19 +323,19 @@ function updateLivePrices(symbolList) {
     })
     symbolList.forEach(symbol => {
         // console.log('symbol to search', symbol)
-        if (document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}'`)){
+        if (document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}'`)) {
             row = document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}'`)
             row.setAttribute('change-pct', symbol['changepct']);
             row.children.item(1).textContent = symbol['last'];
             row.children.item(2).textContent = symbol['change'];
             row.children.item(3).textContent = symbol['changepct'] + '%';
-            if (symbol['change']<0){
+            if (symbol['change'] < 0) {
                 row.children.item(2).classList.remove('price_green');
                 row.children.item(2).classList.add('price_red');
                 row.children.item(3).classList.remove('price_green');
                 row.children.item(3).classList.add('price_red');
             }
-            else{
+            else {
                 row.children.item(2).classList.remove('price_red');
                 row.children.item(2).classList.add('price_green');
                 row.children.item(3).classList.remove('price_red');
@@ -343,7 +348,7 @@ function updateLivePrices(symbolList) {
 
 initv3();
 
-function sortSymbolsByPriceChange(){
+function sortSymbolsByPriceChange() {
     var list = document.getElementById('symbolList');
 
     var items = list.childNodes;
@@ -353,8 +358,8 @@ function sortSymbolsByPriceChange(){
             itemsArr.push(items[i]);
         }
     }
-    itemsArr.sort(function(a, b) {
-    return b.getAttribute('change-pct') - a.getAttribute('change-pct');
+    itemsArr.sort(function (a, b) {
+        return b.getAttribute('change-pct') - a.getAttribute('change-pct');
     });
 
     for (i = 0; i < itemsArr.length; ++i) {
@@ -362,34 +367,34 @@ function sortSymbolsByPriceChange(){
     }
 }
 
-function getVisibleElements( ) {
-    if(timer !== null) {
+function getVisibleElements() {
+    if (timer !== null) {
         clearTimeout(timer);
     }
-    timer = setTimeout(function() {
+    timer = setTimeout(function () {
         const allElements = document.querySelectorAll('#symbolList tr');
         let elements = [];
-        allElements.forEach(function(node){
+        allElements.forEach(function (node) {
             let clientRect = node.getBoundingClientRect();
-            if (!(window.innerHeight <= clientRect.top || (clientRect.top <= 0 && clientRect.bottom <= 0)) ) {
-            // console.log(node, node.children);
-            if (node.getAttribute('data-name') != null)
-                elements.push(node.getAttribute('data-name'));
+            if (!(window.innerHeight <= clientRect.top || (clientRect.top <= 0 && clientRect.bottom <= 0))) {
+                // console.log(node, node.children);
+                if (node.getAttribute('data-name') != null)
+                    elements.push(node.getAttribute('data-name'));
             }
         });
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-            chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: elements}, function(response) {});
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: elements }, function (response) { });
         });
-  }, 400);
+    }, 400);
 
 };
 
-function sendSymbolBatch(){
-    console.log("sending batch", symbolsInCurrentWatchlist.slice(currentIndex, currentIndex+BATCHSIZE))
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-        chrome.tabs.sendMessage(tabs[0].id, {visible_symbols: symbolsInCurrentWatchlist.slice(currentIndex, currentIndex+BATCHSIZE)}, function(response) {
+function sendSymbolBatch() {
+    console.log("sending batch", symbolsInCurrentWatchlist.slice(currentIndex, currentIndex + BATCHSIZE))
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: symbolsInCurrentWatchlist.slice(currentIndex, currentIndex + BATCHSIZE) }, function (response) {
         });
     });
-    currentIndex+=BATCHSIZE;
+    currentIndex += BATCHSIZE;
     if (currentIndex > symbolsInCurrentWatchlist.length) currentIndex = 0;
 }
