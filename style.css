@@ -118,3 +118,16 @@
 .navbar div:nth-child(2) > div {
   margin-left: 0.5rem;
 }
+
+.hidden {
+  visibility: hidden;
+}
+
+.sortsvg {
+  display: inline-block;
+  height: 12px;
+}
+
+.sort-button:hover{
+  background-color: #e4e6ed;
+}

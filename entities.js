@@ -20,13 +20,11 @@ function UpdateStorage(key, value) {
 }
 
 class Watchlist {
-    static BATCHSIZE = 10;
 
     constructor(name=Constants.DEFAULT_WATCHLIST_NAME) {
         // console.log(name);
         this.name = name;
         this.stocks = [];
-        this.currentIndex = 0;
     }
     addStocks(symbols){
         symbols = symbols.map(function (value) {
@@ -68,22 +66,12 @@ class Watchlist {
     get symbols() {
         return this.stocks;
     }
-
-    sendSymbolBatch() {
-        console.log("sending batch", this.symbols.slice(this.currentIndex, this.currentIndex + Watchlist.BATCHSIZE))
-        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: this.symbols.slice(this.currentIndex, this.currentIndex + Watchlist.BATCHSIZE) }, function (response) {
-            });
-        });
-        this.currentIndex += Watchlist.BATCHSIZE;
-        if (this.currentIndex > this.stocks.length) this.currentIndex = 0;
-    }
 }
 
 
 class Configurables {
     static SORT_TYPE = {Unsorted: 'unsorted', Asc: 'asc', Desc: 'desc'}
-    static PRICE_UPDATE_METHOD = {OnScroll: 'onscroll', RoundRobin: 'roundrobin'}
+    static PRICE_UPDATE_METHOD = {None: 'none', OnScroll: 'onscroll', RoundRobin: 'roundrobin'}
     static SELECTED_WATCHLIST_KEY = 'selected_watchlist'
     static SORT_TYPE_KEY = 'sort_status'
     static WATCHLISTS_KEY = 'watchlists'
@@ -109,7 +97,11 @@ class Configurables {
                 configurables[Configurables.SELECTED_WATCHLIST_KEY]
             ).fetchStocksFromStorage()
             console.log()
-            this.sortType = configurables[Configurables.SORT_TYPE]
+            if(Object.values(Configurables.SORT_TYPE).includes(configurables[Configurables.SORT_TYPE_KEY])){
+                console.log(configurables[Configurables.SORT_TYPE_KEY]);
+                this.sortType = configurables[Configurables.SORT_TYPE_KEY]
+            }
+            if(typeof(configurables[Configurables.PRICE_UPDATE_METHOD_KEY], "string"))
             this.priceUpdateMethod = configurables[Configurables.PRICE_UPDATE_METHOD_KEY]
         }
         else {
@@ -162,7 +154,7 @@ class WatchlistInterface {
         // Create a table row (<tr> element)
         var tableRow = document.createElement('tr');
         tableRow.setAttribute('data-name', symbol);
-        tableRow.setAttribute('change-pct', -101); // assign lowest change in price for sorting
+        tableRow.setAttribute('change-pct', undefined); // assign lowest change in price for sorting
         // Create a table header cell (<th> element) with the "scope" attribute
         var th = document.createElement('td');
         th.setAttribute('scope', 'row');
@@ -240,6 +232,7 @@ class WatchlistInterface {
         return symbol;
     }
     static getVisibleElements() {
+        console.log("scrolled")
         if (WatchlistInterface.scrollPriceUpdateTimer !== null) {
             clearTimeout(WatchlistInterface.scrollPriceUpdateTimer);
         }
@@ -261,6 +254,7 @@ class WatchlistInterface {
 
     };
 
+    static updateLivePrices(symbolList, sortType) {
     static updateLivePrices(symbolList) {
         symbolList = symbolList.map(symbol => {
             if (isNaN(parseInt(symbol['change'].charAt(0), 10))) {
@@ -281,7 +275,6 @@ class WatchlistInterface {
                 row.setAttribute('change-pct', symbol['changepct']);
                 row.children.item(1).textContent = symbol['last'];
                 row.children.item(2).textContent = symbol['change'];
-                row.children.item(3).textContent = symbol['changepct'] + '%';
                 if (symbol['change'] < 0) {
                     row.children.item(2).classList.remove('price_green');
                     row.children.item(2).classList.add('price_red');
@@ -296,24 +289,49 @@ class WatchlistInterface {
                 }
             }
         })
-        WatchlistInterface.sortSymbolsByPriceChange();
+        WatchlistInterface.sortSymbolsByPriceChange(sortType);
     }
 
-    static sortSymbolsByPriceChange() {
+    static sortSymbolsByPriceChange(sortType) {
+        if (sortType === Configurables.SORT_TYPE.Unsorted) return;
+        var defaultPrice = -101; // If sort in desc, then undefined values should go at bottom
+        if (sortType === Configurables.SORT_TYPE.Asc)
+            defaultPrice = 10000; // If sort in asc, then undefined values should go at bottom
         var list = document.getElementById('symbolList');
         var items = list.childNodes;
         var itemsArr = [];
         for (var i in items) {
             if (items[i].nodeType == 1) { // get rid of the whitespace text nodes
-                itemsArr.push(items[i]);
+                if (items[i].getAttribute('change-pct') < -100 || items[i].getAttribute('change-pct') > 9999)
+                    items[i].setAttribute('change-pct', defaultPrice);
+                var item = {
+                    'data-name': items[i].getAttribute('data-name'),
+                    'symbol': items[i].children.item(0).textContent,
+                    'last': items[i].children.item(1).textContent,
+                    'change': items[i].children.item(2).textContent,
+                    'changepct': items[i].children.item(3).textContent,
+                    'change-pct': items[i].getAttribute('change-pct'),
+                }
+                itemsArr.push(item);
             }
         }
         itemsArr.sort(function (a, b) {
-            return b.getAttribute('change-pct') - a.getAttribute('change-pct');
+            if(sortType === Configurables.SORT_TYPE.Asc)
+                return a['change-pct'] - b['change-pct'];
+            return b['change-pct'] - a['change-pct'];
         });
 
         for (i = 0; i < itemsArr.length; ++i) {
-            list.appendChild(itemsArr[i]);
+            items[i].setAttribute('data-name', itemsArr[i]['data-name']);
+            items[i].setAttribute('change-pct', itemsArr[i]['change-pct']);
+            items[i].children.item(0).textContent = itemsArr[i]['symbol'];
+            items[i].children.item(1).textContent = itemsArr[i]['last'];
+            items[i].children.item(2).textContent = itemsArr[i]['change'];
+            if(isNaN(itemsArr[i]['change-pct']))
+                items[i].children.item(3).textContent = '-';
+            else
+                items[i].children.item(3).textContent = itemsArr[i]['change-pct'] +'%';
+            // list.appendChild(itemsArr[i]);
         }
     }
 }
@@ -376,8 +394,13 @@ class WatchlistOptionsInterface {
 
 
 class MasterInterface{
+    static PRICEUPDATEINTERVAL = 5000;
+    static BATCHSIZE = 30;
+    static PRICEUPDATEOBJECT = null;
+
     constructor(){
         this.configurables = new Configurables();
+        this.currentIndex = 0;
     }
     async init(){
         await this.configurables.getConfigurablesFromStorage();
@@ -385,21 +408,13 @@ class MasterInterface{
         document.getElementById("inputSubmit").addEventListener("click", this.addNewStocks.bind(this));
         document.getElementById("createWatchlist").addEventListener("click", this.createWatchlist.bind(this));
         document.querySelector(".table-container").addEventListener("scroll", WatchlistOptionsInterface.getVisibleElements);
-        // toggleSwitch = document.getElementById("toggleSort");
-        // if (this.configurables.priceUpdateMethod==Configurables.PRICE_UPDATE_METHOD.RoundRobin) {
-        //     toggleSwitch.setAttribute("checked", "")
-        // }
-        // toggleSwitch.addEventListener("click", toggleSort);
+        document.getElementById("priceSortButton").addEventListener("click", this.priceSortMethodEventListener.bind(this));
+        // document.getElementById("toggleSort").addEventListener("click", this.toggleObserver.bind(this));
         this.initWatchlistOptions();
         this.initWatchlist();
-        chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-            if (msg.livePrices != null) {
-                // console.log('found live prices', msg.livePrices)
-                WatchlistInterface.updateLivePrices(msg.livePrices);
-                sendResponse("done");
-            }
-            return true;
-        });
+        this.initPriceUpdateMethod();
+        console.log(this.configurables);
+        chrome.runtime.onMessage.addListener(this.livePriceEventListener.bind(this));
 
     }
     async selectWatchlistEventListener(event){
@@ -428,6 +443,16 @@ class MasterInterface{
     }
 
     initWatchlist(){
+        var sortSvg = document.querySelector(".sortsvg");
+        if (this.configurables.sortType === Configurables.SORT_TYPE.Asc){
+            sortSvg.setAttribute('src', 'up-arrow.svg');
+            sortSvg.classList.remove('hidden');
+        }
+        else if (this.configurables.sortType === Configurables.SORT_TYPE.Desc){
+            sortSvg.setAttribute('src', 'down-arrow.svg');
+            sortSvg.classList.remove('hidden');
+        }
+
         WatchlistInterface.clearTable();
         WatchlistInterface.createTable(
             this.configurables.selectedWatchlist.symbols,
@@ -474,6 +499,86 @@ class MasterInterface{
             this.initWatchlist();
         }
     }
+
+    initPriceUpdateMethod(){
+        var priceMethod = document.getElementById("selectpricemethod");
+        console.log(this.configurables.priceUpdateMethod);
+        priceMethod.value = this.configurables.priceUpdateMethod;
+        this.setPriceUpdateMethod(this.configurables.priceUpdateMethod);
+        priceMethod.addEventListener("click", this.priceUpdateMethodEventListener.bind(this));
+    }
+
+    setPriceUpdateMethod(value){
+        if(
+            value !== this.configurables.priceUpdateMethod
+            && Object.values(Configurables.PRICE_UPDATE_METHOD).includes(value)
+        ){
+            this.configurables.priceUpdateMethod = value;
+            this.configurables.updateStorage();
+            if(MasterInterface.PRICEUPDATEOBJECT)
+                clearInterval(MasterInterface.PRICEUPDATEOBJECT);
+            document.querySelector(".table-container").removeEventListener("scroll", WatchlistInterface.getVisibleElements);
+        }
+
+        if(value===Configurables.PRICE_UPDATE_METHOD.OnScroll){
+            console.log("price update method: onscroll");
+            document.querySelector(".table-container").addEventListener("scroll", WatchlistInterface.getVisibleElements);
+        }
+
+        else if(value===Configurables.PRICE_UPDATE_METHOD.RoundRobin){
+            console.log("price update method: RR");
+            if(!MasterInterface.PRICEUPDATEOBJECT)
+                MasterInterface.PRICEUPDATEOBJECT = setInterval(
+                    this.sendSymbolBatch.bind(this),
+                    MasterInterface.PRICEUPDATEINTERVAL,
+                )
+        }
+    }
+
+    priceUpdateMethodEventListener(event){
+        console.log(event.currentTarget, event.currentTarget.value);
+        this.setPriceUpdateMethod(event.currentTarget.value);
+    }
+    sendSymbolBatch() {
+        var symbols = this.configurables.selectedWatchlist.symbols.slice(this.currentIndex, this.currentIndex + MasterInterface.BATCHSIZE);
+        console.log("sending batch", symbols)
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: symbols }, function (response) {
+            });
+        });
+        this.currentIndex += MasterInterface.BATCHSIZE;
+        if (this.currentIndex > this.configurables.selectedWatchlist.symbols.length) this.currentIndex = 0;
+    }
+
+    priceSortMethodEventListener(){
+        var sortSvg = document.querySelector(".sortsvg");
+        if (this.configurables.sortType === Configurables.SORT_TYPE.Unsorted) {
+            sortSvg.setAttribute('src', 'down-arrow.svg');
+            sortSvg.classList.remove('hidden');
+            this.configurables.sortType = Configurables.SORT_TYPE.Desc;
+        }
+        else if (this.configurables.sortType === Configurables.SORT_TYPE.Desc) {
+            sortSvg.setAttribute('src', 'up-arrow.svg');
+            sortSvg.classList.remove('hidden');
+            this.configurables.sortType = Configurables.SORT_TYPE.Asc;
+        }
+        else {
+            sortSvg.classList.add('hidden');
+            this.configurables.sortType = Configurables.SORT_TYPE.Unsorted;
+        }
+        this.configurables.updateStorage();
+        WatchlistInterface.sortSymbolsByPriceChange(this.configurables.sortType);
+    }
+
+    livePriceEventListener(msg, sender, sendResponse) {
+        if (msg.livePrices != null) {
+            // console.log('found live prices', msg.livePrices)
+            WatchlistInterface.updateLivePrices(msg.livePrices, this.configurables.sortType);
+            sendResponse("done");
+    }
+        return true;
+    }
+
 }
 
 

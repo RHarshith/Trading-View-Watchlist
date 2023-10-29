@@ -131,8 +131,9 @@ async function clearWatchlist(symbols) {
     if (container) symbolElements = container.firstChild;
     counter += 1
   }
+  await delay(500);
   console.log('total cleared', counter)
-  addSymbols(symbols)
+  addSymbols(symbols);
 }
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
