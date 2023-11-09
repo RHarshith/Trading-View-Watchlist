@@ -1,8 +1,9 @@
 const Constants = Object.freeze({
     DEFAULT_EXCHANGE: 'NSE:',
     DEFAULT_WATCHLIST_NAME: 'watchlist',
+    SCAN_API: "https://scanner.tradingview.com/india/scan"
 })
-
+var responseGlobal = null;
 const StorageKeys = Object.freeze({
     WATCHLISTS: 'watchlist_4c70dd20-2688-4a0f-bfc1-ff6a8eff097d',
     CONFIGURABLES: 'configurables'
@@ -102,7 +103,7 @@ class Configurables {
                 this.sortType = configurables[Configurables.SORT_TYPE_KEY]
             }
             if(typeof(configurables[Configurables.PRICE_UPDATE_METHOD_KEY], "string"))
-            this.priceUpdateMethod = configurables[Configurables.PRICE_UPDATE_METHOD_KEY]
+                this.priceUpdateMethod = configurables[Configurables.PRICE_UPDATE_METHOD_KEY]
         }
         else {
             this.selectedWatchlist = await new Watchlist(this.watchlists[0]).fetchStocksFromStorage();
@@ -149,6 +150,7 @@ class Configurables {
 class WatchlistInterface {
     static tableBody = document.querySelector("#myTable tbody");
     static scrollPriceUpdateTimer = null;
+    static selectedSymbol = null;
 
     static appendSymbolToTable(symbol, deleteSymbolEventListener) {
         // Create a table row (<tr> element)
@@ -194,8 +196,43 @@ class WatchlistInterface {
         tableRow.appendChild(buttonCell);
 
         tableRow.addEventListener("click", WatchlistInterface.openChartEventListener);
+        tableRow.addEventListener("click", WatchlistInterface.selectedWatchlistEventListener)
         WatchlistInterface.tableBody.appendChild(tableRow);
 
+    }
+    static symbolKeyboardEventListener(event){
+        if (!['ArrowUp', 'ArrowDown', 'Delete'].includes(event.key))
+            return;
+        if (event.key === "Delete") {
+            if (WatchlistInterface.selectedSymbol !== null){
+                document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}'] .delete-symbol`).click()
+            }
+        }
+
+        if (event.key === "ArrowUp") {
+            var prevRow = document.querySelector(`#symbolList > tr`);
+            if (WatchlistInterface.selectedSymbol !== null){
+                prevRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`).previousElementSibling;
+            }
+            if(prevRow) prevRow.click();
+        }
+        else if (event.key === "ArrowDown") {
+            var nextRow = document.querySelector(`#symbolList > tr`);
+            if (WatchlistInterface.selectedSymbol !== null){
+                nextRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`).nextElementSibling;
+            }
+            if(nextRow) nextRow.click();
+        }
+
+    }
+    static selectedWatchlistEventListener(event) {
+        var row = event.currentTarget;
+        if(WatchlistInterface.selectedSymbol !== null){
+            var prevRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`)
+            prevRow.classList.remove("selected-symbol");
+        }
+        row.classList.add("selected-symbol");
+        WatchlistInterface.selectedSymbol = row.getAttribute('data-name');
     }
 
     static clearTable() {
@@ -227,51 +264,22 @@ class WatchlistInterface {
         var clickedRow = event.target.parentNode.parentNode; // Get the row of clicked button
         if (!clickedRow) return;
         var symbol = clickedRow.getAttribute('data-name');
+        var nextRow = clickedRow.nextElementSibling;
+        WatchlistInterface.selectedSymbol = null;
+        if(nextRow !== null){
+            nextRow.click();
+        }
         clickedRow.parentNode.removeChild(clickedRow);
         event.stopPropagation();
         return symbol;
     }
-    static getVisibleElements() {
-        console.log("scrolled")
-        if (WatchlistInterface.scrollPriceUpdateTimer !== null) {
-            clearTimeout(WatchlistInterface.scrollPriceUpdateTimer);
-        }
-        WatchlistInterface.scrollPriceUpdateTimer = setTimeout(function () {
-            const allElements = document.querySelectorAll('#symbolList tr');
-            let elements = [];
-            allElements.forEach(function (node) {
-                let clientRect = node.getBoundingClientRect();
-                if (!(window.innerHeight <= clientRect.top || (clientRect.top <= 0 && clientRect.bottom <= 0))) {
-                    // console.log(node, node.children);
-                    if (node.getAttribute('data-name') != null)
-                        elements.push(node.getAttribute('data-name'));
-                }
-            });
-            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-                chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: elements }, function (response) { });
-            });
-        }, 400);
 
-    };
 
     static updateLivePrices(symbolList, sortType) {
-    static updateLivePrices(symbolList) {
-        symbolList = symbolList.map(symbol => {
-            if (isNaN(parseInt(symbol['change'].charAt(0), 10))) {
-                // console.log()
-                symbol['change'] = parseFloat(symbol['change'].slice(1)) * -1
-                symbol['changepct'] = parseFloat(symbol['changepct'].slice(1)) * -1
-            }
-            else {
-                symbol['change'] = parseFloat(symbol['change'])
-                symbol['changepct'] = parseFloat(symbol['changepct'])
-            }
-            return symbol
-        })
         symbolList.forEach(symbol => {
             // console.log('symbol to search', symbol)
-            if (document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}'`)) {
-                var row = document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}'`)
+            if (document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}']`)) {
+                var row = document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}']`)
                 row.setAttribute('change-pct', symbol['changepct']);
                 row.children.item(1).textContent = symbol['last'];
                 row.children.item(2).textContent = symbol['change'];
@@ -288,8 +296,12 @@ class WatchlistInterface {
                     row.children.item(3).classList.add('price_green');
                 }
             }
+            else{
+                console.log('symbol not found', symbol)
+            }
         })
         WatchlistInterface.sortSymbolsByPriceChange(sortType);
+        WatchlistInterface.colorPriceChange();
     }
 
     static sortSymbolsByPriceChange(sortType) {
@@ -333,6 +345,27 @@ class WatchlistInterface {
                 items[i].children.item(3).textContent = itemsArr[i]['change-pct'] +'%';
             // list.appendChild(itemsArr[i]);
         }
+    }
+
+    static colorPriceChange(){
+        var symbolList = document.getElementById('symbolList');
+        var rows = symbolList.childNodes;
+        rows.forEach(
+            row => {
+                if (row.getAttribute('change-pct') < 0) {
+                    row.children.item(2).classList.remove('price_green');
+                    row.children.item(2).classList.add('price_red');
+                    row.children.item(3).classList.remove('price_green');
+                    row.children.item(3).classList.add('price_red');
+                }
+                else {
+                    row.children.item(2).classList.remove('price_red');
+                    row.children.item(2).classList.add('price_green');
+                    row.children.item(3).classList.remove('price_red');
+                    row.children.item(3).classList.add('price_green');
+                }
+            }
+        )
     }
 }
 
@@ -394,9 +427,8 @@ class WatchlistOptionsInterface {
 
 
 class MasterInterface{
-    static PRICEUPDATEINTERVAL = 5000;
+    static PRICEUPDATEINTERVAL = 10000;
     static BATCHSIZE = 30;
-    static PRICEUPDATEOBJECT = null;
 
     constructor(){
         this.configurables = new Configurables();
@@ -407,16 +439,56 @@ class MasterInterface{
         await this.configurables.selectedWatchlist.fetchStocksFromStorage();
         document.getElementById("inputSubmit").addEventListener("click", this.addNewStocks.bind(this));
         document.getElementById("createWatchlist").addEventListener("click", this.createWatchlist.bind(this));
-        document.querySelector(".table-container").addEventListener("scroll", WatchlistOptionsInterface.getVisibleElements);
         document.getElementById("priceSortButton").addEventListener("click", this.priceSortMethodEventListener.bind(this));
-        // document.getElementById("toggleSort").addEventListener("click", this.toggleObserver.bind(this));
         this.initWatchlistOptions();
         this.initWatchlist();
-        this.initPriceUpdateMethod();
+        document.addEventListener('keydown', WatchlistInterface.symbolKeyboardEventListener);
         console.log(this.configurables);
-        chrome.runtime.onMessage.addListener(this.livePriceEventListener.bind(this));
+        this.initLivePrices();
+        if(MasterInterface.isTradingHours())
+            setInterval(
+                this.initLivePrices.bind(this),
+                MasterInterface.PRICEUPDATEINTERVAL
+            )
+    }
+
+    async initLivePrices(){
+        var ApiResponses = [];
+        this.configurables.selectedWatchlist.symbols.forEach(
+            symbol => {
+                var payload = JSON.stringify({"filter":[{"left":"name","operation":"match","right":symbol.split(':')[1]},{"left":"exchange","operation":"equal","right":symbol.split(':')[0]}],"options":{"lang":"en"},"markets":["india"],"columns":["logoid","name","close","change","change_abs","volume","Value.Traded","market_cap_basic","sector","description", "average_volume_60d_calc"]})
+                // console.log(payload)
+                ApiResponses.push(
+                    fetch(Constants.SCAN_API, {
+                        method: "POST",
+                        body: payload,
+                        headers: {
+                            "Content-type": "application/json; charset=UTF-8"
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(json => {
+                        if(!json["data"]){
+                            return null;
+                        }
+                        for(let idx in json["data"]) {
+                            var data = json["data"][idx]["d"];
+                            var apiSymbol = json["data"][idx]["s"];
+                            if(apiSymbol === symbol)
+                                return { symbol: symbol, last: data[2].toFixed(2), change: data[4].toFixed(2), changepct: data[3].toFixed(2) }
+                        }
+                        return null;
+
+                    })
+                )
+            }
+        )
+        var responses = await Promise.all(ApiResponses);
+        console.log(responses);
+        WatchlistInterface.updateLivePrices(responses.filter(val => val !== null), this.configurables.sortType);
 
     }
+
     async selectWatchlistEventListener(event){
         console.log(event.target);
         var watchlist = event.currentTarget.getAttribute('data-name');
@@ -425,6 +497,7 @@ class MasterInterface{
         console.log(this.configurables.selectedWatchlist);
         WatchlistOptionsInterface.setSelectedWatchlistButton(this.configurables.selectedWatchlist.name);
         this.initWatchlist();
+        this.initLivePrices();
     }
 
     async deleteWatchlistEventListener(event){
@@ -452,13 +525,12 @@ class MasterInterface{
             sortSvg.setAttribute('src', 'down-arrow.svg');
             sortSvg.classList.remove('hidden');
         }
-
+        WatchlistInterface.selectedSymbol = null;
         WatchlistInterface.clearTable();
         WatchlistInterface.createTable(
             this.configurables.selectedWatchlist.symbols,
             this.deleteSymbolEventListener.bind(this)
         );
-        WatchlistInterface.getVisibleElements();
 
     }
 
@@ -486,7 +558,6 @@ class MasterInterface{
                 values,
                 this.deleteSymbolEventListener.bind(this)
             );
-            WatchlistInterface.getVisibleElements();
         }
     }
 
@@ -498,56 +569,6 @@ class MasterInterface{
             this.initWatchlistOptions();
             this.initWatchlist();
         }
-    }
-
-    initPriceUpdateMethod(){
-        var priceMethod = document.getElementById("selectpricemethod");
-        console.log(this.configurables.priceUpdateMethod);
-        priceMethod.value = this.configurables.priceUpdateMethod;
-        this.setPriceUpdateMethod(this.configurables.priceUpdateMethod);
-        priceMethod.addEventListener("click", this.priceUpdateMethodEventListener.bind(this));
-    }
-
-    setPriceUpdateMethod(value){
-        if(
-            value !== this.configurables.priceUpdateMethod
-            && Object.values(Configurables.PRICE_UPDATE_METHOD).includes(value)
-        ){
-            this.configurables.priceUpdateMethod = value;
-            this.configurables.updateStorage();
-            if(MasterInterface.PRICEUPDATEOBJECT)
-                clearInterval(MasterInterface.PRICEUPDATEOBJECT);
-            document.querySelector(".table-container").removeEventListener("scroll", WatchlistInterface.getVisibleElements);
-        }
-
-        if(value===Configurables.PRICE_UPDATE_METHOD.OnScroll){
-            console.log("price update method: onscroll");
-            document.querySelector(".table-container").addEventListener("scroll", WatchlistInterface.getVisibleElements);
-        }
-
-        else if(value===Configurables.PRICE_UPDATE_METHOD.RoundRobin){
-            console.log("price update method: RR");
-            if(!MasterInterface.PRICEUPDATEOBJECT)
-                MasterInterface.PRICEUPDATEOBJECT = setInterval(
-                    this.sendSymbolBatch.bind(this),
-                    MasterInterface.PRICEUPDATEINTERVAL,
-                )
-        }
-    }
-
-    priceUpdateMethodEventListener(event){
-        console.log(event.currentTarget, event.currentTarget.value);
-        this.setPriceUpdateMethod(event.currentTarget.value);
-    }
-    sendSymbolBatch() {
-        var symbols = this.configurables.selectedWatchlist.symbols.slice(this.currentIndex, this.currentIndex + MasterInterface.BATCHSIZE);
-        console.log("sending batch", symbols)
-        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, { visible_symbols: symbols }, function (response) {
-            });
-        });
-        this.currentIndex += MasterInterface.BATCHSIZE;
-        if (this.currentIndex > this.configurables.selectedWatchlist.symbols.length) this.currentIndex = 0;
     }
 
     priceSortMethodEventListener(){
@@ -570,17 +591,24 @@ class MasterInterface{
         WatchlistInterface.sortSymbolsByPriceChange(this.configurables.sortType);
     }
 
-    livePriceEventListener(msg, sender, sendResponse) {
-        if (msg.livePrices != null) {
-            // console.log('found live prices', msg.livePrices)
-            WatchlistInterface.updateLivePrices(msg.livePrices, this.configurables.sortType);
-            sendResponse("done");
-    }
+    static isTradingHours(){
+        // Get the current date and time
+        const now = new Date();
+        // Check if it's Saturday or Sunday
+        const day = now.getDay(); // 0 is Sunday, 6 is Saturday
+        const isWeekend = day === 0 || day === 6;
+        // Check if the time is not between 9:00 and 15:30
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        const isBeforeNine = hour < 9 || (hour === 9 && minute < 0);
+        const isAfterThreeThirty = hour > 15 || (hour === 15 && minute >= 30);
+
+        if (isWeekend || isBeforeNine || isAfterThreeThirty) return false;
         return true;
     }
 
 }
 
 
-masterInterface = new MasterInterface();
+var masterInterface = new MasterInterface();
 masterInterface.init();

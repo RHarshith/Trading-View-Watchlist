@@ -131,3 +131,7 @@
 .sort-button:hover{
   background-color: #e4e6ed;
 }
+
+.selected-symbol{
+  background-color: #e4e6ed;
+}
