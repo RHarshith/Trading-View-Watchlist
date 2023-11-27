@@ -20,6 +20,14 @@ function UpdateStorage(key, value) {
     chrome.storage.local.set(obj, function () { console.log("Updated storage:", key, value) });
 }
 
+class Utils {
+    static getElementIndex(elem){
+        var  i= 1;
+        while((elem=elem.previousSibling)!=null) ++i;
+        return i;
+    }
+}
+
 class Watchlist {
 
     constructor(name=Constants.DEFAULT_WATCHLIST_NAME) {
@@ -149,14 +157,13 @@ class Configurables {
 
 class WatchlistInterface {
     static tableBody = document.querySelector("#myTable tbody");
-    static scrollPriceUpdateTimer = null;
     static selectedSymbol = null;
 
     static appendSymbolToTable(symbol, deleteSymbolEventListener) {
         // Create a table row (<tr> element)
         var tableRow = document.createElement('tr');
         tableRow.setAttribute('data-name', symbol);
-        tableRow.setAttribute('change-pct', undefined); // assign lowest change in price for sorting
+        tableRow.setAttribute('change-pct', null); // assign lowest change in price for sorting
         // Create a table header cell (<th> element) with the "scope" attribute
         var th = document.createElement('td');
         th.setAttribute('scope', 'row');
@@ -205,21 +212,21 @@ class WatchlistInterface {
             return;
         if (event.key === "Delete") {
             if (WatchlistInterface.selectedSymbol !== null){
-                document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}'] .delete-symbol`).click()
+                document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol}) .delete-symbol`).click()
             }
         }
 
         if (event.key === "ArrowUp") {
             var prevRow = document.querySelector(`#symbolList > tr`);
             if (WatchlistInterface.selectedSymbol !== null){
-                prevRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`).previousElementSibling;
+                prevRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).previousElementSibling;
             }
             if(prevRow) prevRow.click();
         }
         else if (event.key === "ArrowDown") {
             var nextRow = document.querySelector(`#symbolList > tr`);
             if (WatchlistInterface.selectedSymbol !== null){
-                nextRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`).nextElementSibling;
+                nextRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).nextElementSibling;
             }
             if(nextRow) nextRow.click();
         }
@@ -228,11 +235,11 @@ class WatchlistInterface {
     static selectedWatchlistEventListener(event) {
         var row = event.currentTarget;
         if(WatchlistInterface.selectedSymbol !== null){
-            var prevRow = document.querySelector(`#symbolList tr[data-name='${WatchlistInterface.selectedSymbol}']`)
+            var prevRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`)
             prevRow.classList.remove("selected-symbol");
         }
         row.classList.add("selected-symbol");
-        WatchlistInterface.selectedSymbol = row.getAttribute('data-name');
+        WatchlistInterface.selectedSymbol = Utils.getElementIndex(row);
     }
 
     static clearTable() {
@@ -276,6 +283,7 @@ class WatchlistInterface {
 
 
     static updateLivePrices(symbolList, sortType) {
+        console.log(symbolList);
         symbolList.forEach(symbol => {
             // console.log('symbol to search', symbol)
             if (document.querySelector(`#symbolList tr[data-name='${symbol['symbol']}']`)) {
@@ -283,18 +291,7 @@ class WatchlistInterface {
                 row.setAttribute('change-pct', symbol['changepct']);
                 row.children.item(1).textContent = symbol['last'];
                 row.children.item(2).textContent = symbol['change'];
-                if (symbol['change'] < 0) {
-                    row.children.item(2).classList.remove('price_green');
-                    row.children.item(2).classList.add('price_red');
-                    row.children.item(3).classList.remove('price_green');
-                    row.children.item(3).classList.add('price_red');
-                }
-                else {
-                    row.children.item(2).classList.remove('price_red');
-                    row.children.item(2).classList.add('price_green');
-                    row.children.item(3).classList.remove('price_red');
-                    row.children.item(3).classList.add('price_green');
-                }
+                row.children.item(3).textContent = symbol['changepct']+'%';
             }
             else{
                 console.log('symbol not found', symbol)
@@ -311,10 +308,11 @@ class WatchlistInterface {
             defaultPrice = 10000; // If sort in asc, then undefined values should go at bottom
         var list = document.getElementById('symbolList');
         var items = list.childNodes;
+        console.log(items);
         var itemsArr = [];
         for (var i in items) {
             if (items[i].nodeType == 1) { // get rid of the whitespace text nodes
-                if (items[i].getAttribute('change-pct') < -100 || items[i].getAttribute('change-pct') > 9999)
+                if (isNaN(items[i].getAttribute('change-pct')))
                     items[i].setAttribute('change-pct', defaultPrice);
                 var item = {
                     'data-name': items[i].getAttribute('data-name'),
@@ -333,14 +331,17 @@ class WatchlistInterface {
             return b['change-pct'] - a['change-pct'];
         });
 
+        console.log(itemsArr[i]);
         for (i = 0; i < itemsArr.length; ++i) {
             items[i].setAttribute('data-name', itemsArr[i]['data-name']);
             items[i].setAttribute('change-pct', itemsArr[i]['change-pct']);
             items[i].children.item(0).textContent = itemsArr[i]['symbol'];
             items[i].children.item(1).textContent = itemsArr[i]['last'];
             items[i].children.item(2).textContent = itemsArr[i]['change'];
-            if(isNaN(itemsArr[i]['change-pct']))
+            if(itemsArr[i]['change-pct'] === defaultPrice){
                 items[i].children.item(3).textContent = '-';
+                items[i].setAttribute('change-pct', null);
+            }
             else
                 items[i].children.item(3).textContent = itemsArr[i]['change-pct'] +'%';
             // list.appendChild(itemsArr[i]);
@@ -445,7 +446,7 @@ class MasterInterface{
         document.addEventListener('keydown', WatchlistInterface.symbolKeyboardEventListener);
         console.log(this.configurables);
         this.initLivePrices();
-        if(MasterInterface.isTradingHours())
+        if(true || MasterInterface.isTradingHours())
             setInterval(
                 this.initLivePrices.bind(this),
                 MasterInterface.PRICEUPDATEINTERVAL
