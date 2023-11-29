@@ -34,6 +34,9 @@ Chrome extension to provide stock watchlist for trading view website.
 12. Navigate between stocks using up/down arrow keys or by clicking on the stocks.
 13. Delete stocks or watchlist by clicking on the 'x' button that appears when you hover over a stock or watchlist.
 14. Use 1,2,3 keyboard keys to bookmark stocks in 3 colors.
+15. Sort stocks by price by clicking on the 'chg%' header in watchlist.
+    <img width="214" alt="image" src="https://github.com/RHarshith/Trading-View-Watchlist/assets/43510025/204f9773-de3f-4e48-9146-0aa181447fae">
+
 
 \* There are no limits set on number of watchlists or symbols per watchlist, but there is an internal limit on amount of storage a chrome extension can use, which is 10MB.
   Read more on this [here](https://developer.chrome.com/docs/extensions/reference/storage/#property-local)
