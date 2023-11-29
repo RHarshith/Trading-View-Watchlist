@@ -14,6 +14,13 @@ const WatchlistConfigurables = Object.freeze({
     WATCHLISTS: 'watchlists'
 })
 
+const ColorMap = Object.freeze({
+    0: "bm-0",
+    1: "bm-1",
+    2: "bm-2",
+    3: "bm-3"
+})
+
 function UpdateStorage(key, value) {
     obj = {}
     obj[key] = value;
@@ -26,6 +33,29 @@ class Utils {
         while((elem=elem.previousSibling)!=null) ++i;
         return i;
     }
+
+    static removeKeyFromStorage(key){
+        chrome.storage.local.remove([key]);
+    }
+}
+
+class Stock {
+    static SYMBOL = "symbol";
+    static BOOKMARK_COLOR = "bookmark_color";
+    constructor(data) {
+        if(data.hasOwnProperty(Stock.SYMBOL))
+            this.symbol = data[Stock.SYMBOL];
+        this.bookmark_color = null;
+        if(data.hasOwnProperty(Stock.BOOKMARK_COLOR))
+            this.bookmark_color = data[Stock.BOOKMARK_COLOR];    
+    }
+    to_json(){
+        obj = {
+            [Stock.SYMBOL]: this.symbol,
+            [Stock.BOOKMARK_COLOR]: this.bookmark_color
+        }
+        return obj
+    }
 }
 
 class Watchlist {
@@ -34,6 +64,7 @@ class Watchlist {
         // console.log(name);
         this.name = name;
         this.stocks = [];
+        this.stockAttributes = {};
     }
     addStocks(symbols){
         symbols = symbols.map(function (value) {
@@ -48,6 +79,12 @@ class Watchlist {
             return symbol;
         });
         this.stocks = this.stocks.concat(newStocks);
+        for(var i in newStocks){
+            this.stockAttributes[newStocks[i]] = {
+                [Stock.SYMBOL]: newStocks[i]
+            };
+        }
+        console.log(this.stocks, this.stockAttributes);
         this.updateStorage();
         return newStocks;
     }
@@ -56,6 +93,8 @@ class Watchlist {
         const index = this.stocks.indexOf(symbol);
         if (index > -1) { // only splice array when item is found
             this.stocks.splice(index, 1); // 2nd parameter means remove one item only
+            if(this.stockAttributes.hasOwnProperty(symbol))
+                delete this.stockAttributes[symbol];
             this.updateStorage();
         }
     }
@@ -63,17 +102,40 @@ class Watchlist {
     async fetchStocksFromStorage(){
         var stocks = await chrome.storage.local.get(this.name);
         if (stocks.hasOwnProperty(this.name)){
-            this.stocks = stocks[this.name];
+            let stock_objs = stocks[this.name].map(
+                stock => {
+                    if (typeof stock === 'string'){
+                        return {[Stock.SYMBOL]: stock}
+                    }
+                    else
+                        return stock;
+                }
+            )
+            this.stocks = [];
+            this.stockAttributes = {};
+            for(var i in stock_objs){
+                this.stocks.push(stock_objs[i][Stock.SYMBOL]);
+                this.stockAttributes[stock_objs[i][Stock.SYMBOL]] = stock_objs[i];
+            }
         }
         return this;
     }
 
     updateStorage() {
-        UpdateStorage(this.name, this.symbols);
+        let stock_objs = [];
+        for(var i in this.stocks){
+            stock_objs.push(this.stockAttributes[this.stocks[i]]);
+        }
+        UpdateStorage(this.name, stock_objs);
     }
 
     get symbols() {
         return this.stocks;
+    }
+
+    updateAttributes(symbol, attribute, value){
+        this.stockAttributes[symbol][attribute] = value;
+        this.updateStorage();
     }
 }
 
@@ -136,6 +198,7 @@ class Configurables {
             this.selectedWatchlist = await new Watchlist(
                 this.watchlists[0]
             ).fetchStocksFromStorage();
+            Utils.removeKeyFromStorage(watchlistName);
             this.updateStorage();
         }
 
@@ -207,31 +270,7 @@ class WatchlistInterface {
         WatchlistInterface.tableBody.appendChild(tableRow);
 
     }
-    static symbolKeyboardEventListener(event){
-        if (!['ArrowUp', 'ArrowDown', 'Delete'].includes(event.key))
-            return;
-        if (event.key === "Delete") {
-            if (WatchlistInterface.selectedSymbol !== null){
-                document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol}) .delete-symbol`).click()
-            }
-        }
 
-        if (event.key === "ArrowUp") {
-            var prevRow = document.querySelector(`#symbolList > tr`);
-            if (WatchlistInterface.selectedSymbol !== null){
-                prevRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).previousElementSibling;
-            }
-            if(prevRow) prevRow.click();
-        }
-        else if (event.key === "ArrowDown") {
-            var nextRow = document.querySelector(`#symbolList > tr`);
-            if (WatchlistInterface.selectedSymbol !== null){
-                nextRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).nextElementSibling;
-            }
-            if(nextRow) nextRow.click();
-        }
-
-    }
     static selectedWatchlistEventListener(event) {
         var row = event.currentTarget;
         if(WatchlistInterface.selectedSymbol !== null){
@@ -272,17 +311,17 @@ class WatchlistInterface {
         if (!clickedRow) return;
         var symbol = clickedRow.getAttribute('data-name');
         var nextRow = clickedRow.nextElementSibling;
+        clickedRow.parentNode.removeChild(clickedRow);
         WatchlistInterface.selectedSymbol = null;
         if(nextRow !== null){
             nextRow.click();
         }
-        clickedRow.parentNode.removeChild(clickedRow);
         event.stopPropagation();
         return symbol;
     }
 
 
-    static updateLivePrices(symbolList, sortType) {
+    static updateLivePrices(symbolList) {
         console.log(symbolList);
         symbolList.forEach(symbol => {
             // console.log('symbol to search', symbol)
@@ -297,8 +336,7 @@ class WatchlistInterface {
                 console.log('symbol not found', symbol)
             }
         })
-        WatchlistInterface.sortSymbolsByPriceChange(sortType);
-        WatchlistInterface.colorPriceChange();
+
     }
 
     static sortSymbolsByPriceChange(sortType) {
@@ -365,6 +403,36 @@ class WatchlistInterface {
                     row.children.item(3).classList.remove('price_red');
                     row.children.item(3).classList.add('price_green');
                 }
+            }
+        )
+    }
+
+    static addBookMarkColors(attributes, symbol=null){
+        if(symbol){
+            var row = document.querySelector(`#symbolList tr[data-name='${symbol}']`)
+            if(row){
+                let symbol = row.getAttribute('data-name');
+                let color = attributes[symbol][Stock.BOOKMARK_COLOR];
+                for(var key in ColorMap){
+                    row.classList.remove(ColorMap[key]);
+                }
+                if(color)
+                    row.classList.add(ColorMap[color]);
+            }
+            return;
+        }
+        var symbolList = document.getElementById('symbolList');
+        var rows = symbolList.childNodes;
+        rows.forEach(
+            row => {
+                let symbol = row.getAttribute('data-name');
+                let color = attributes[symbol][Stock.BOOKMARK_COLOR];
+                for(var key in ColorMap){
+                    row.classList.remove(ColorMap[key]);
+                }
+                if(color)
+                    row.classList.add(ColorMap[color]);
+
             }
         )
     }
@@ -443,7 +511,7 @@ class MasterInterface{
         document.getElementById("priceSortButton").addEventListener("click", this.priceSortMethodEventListener.bind(this));
         this.initWatchlistOptions();
         this.initWatchlist();
-        document.addEventListener('keydown', WatchlistInterface.symbolKeyboardEventListener);
+        document.addEventListener('keydown', this.symbolKeyboardEventListener.bind(this));
         console.log(this.configurables);
         this.initLivePrices();
         if(true || MasterInterface.isTradingHours())
@@ -487,7 +555,11 @@ class MasterInterface{
         var responses = await Promise.all(ApiResponses);
         console.log(responses);
         WatchlistInterface.updateLivePrices(responses.filter(val => val !== null), this.configurables.sortType);
+        WatchlistInterface.sortSymbolsByPriceChange(this.configurables.sortType);
+        WatchlistInterface.colorPriceChange();
+        WatchlistInterface.addBookMarkColors(this.configurables.selectedWatchlist.stockAttributes);
 
+        
     }
 
     async selectWatchlistEventListener(event){
@@ -532,6 +604,9 @@ class MasterInterface{
             this.configurables.selectedWatchlist.symbols,
             this.deleteSymbolEventListener.bind(this)
         );
+        console.log(this.configurables.selectedWatchlist.stockAttributes);
+        WatchlistInterface.addBookMarkColors(this.configurables.selectedWatchlist.stockAttributes);
+
 
     }
 
@@ -559,6 +634,8 @@ class MasterInterface{
                 values,
                 this.deleteSymbolEventListener.bind(this)
             );
+            // WatchlistInterface.addBookMarkColors(attributes=this.configurables.selectedWatchlist.stockAttributes);
+
         }
     }
 
@@ -606,6 +683,51 @@ class MasterInterface{
 
         if (isWeekend || isBeforeNine || isAfterThreeThirty) return false;
         return true;
+    }
+
+    symbolKeyboardEventListener(event){
+        if (event.key === "Delete") {
+            if (WatchlistInterface.selectedSymbol !== null){
+                document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol}) .delete-symbol`).click()
+            }
+        }
+
+        if (event.key === "ArrowUp") {
+            var prevRow = document.querySelector(`#symbolList > tr`);
+            if (WatchlistInterface.selectedSymbol !== null){
+                prevRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).previousElementSibling;
+            }
+            if(prevRow) prevRow.click();
+        }
+        else if (event.key === "ArrowDown") {
+            var nextRow = document.querySelector(`#symbolList > tr`);
+            if (WatchlistInterface.selectedSymbol !== null){
+                nextRow = document.querySelector(`#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`).nextElementSibling;
+            }
+            if(nextRow) nextRow.click();
+        }
+        else if (event.keyCode >= 48 && event.keyCode <= 57) {
+            // Get the pressed number
+            var pressedNumber = String.fromCharCode(event.keyCode);
+            console.log("Pressed Number: " + pressedNumber);
+            if (WatchlistInterface.selectedSymbol !== null){
+                let symbol = document.querySelector(
+                    `#symbolList tr:nth-child(${WatchlistInterface.selectedSymbol})`
+                ).getAttribute(
+                    'data-name'
+                )
+                this.configurables.selectedWatchlist.updateAttributes(
+                    symbol,
+                    Stock.BOOKMARK_COLOR,
+                    pressedNumber
+                )
+                WatchlistInterface.addBookMarkColors(
+                    this.configurables.selectedWatchlist.stockAttributes,
+                    symbol
+                )
+            }
+        }
+
     }
 
 }

@@ -135,3 +135,18 @@
 .selected-symbol{
   background-color: #e4e6ed;
 }
+
+.bm-0 {
+  border-left: none;
+}
+.bm-1{
+  border-left: 3px solid red;
+}
+
+.bm-2{
+  border-left: 3px solid orange;
+}
+
+.bm-3{
+  border-left: 3px solid green;
+}
