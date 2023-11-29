@@ -5,7 +5,9 @@ Chrome extension to provide stock watchlist for trading view website.
 * No limit on number of symbols per watchlist*.
 * Create multiple watchlist without any limits*.
 * Switch between stocks at blazingly high speeds(Almost equal to actual trading view watchlist speeds)
-* Live stock prices (Coming soon!)
+* Live stock prices (NEW!!)
+* Use arrow keys to navigate( Up, down keys to cycle through stocks)
+* Bookmark stocks with 3 different colors (Press keys 1,2,3)
 * Edit, delete, rename watchlist (Coming soon!)
 * Arrange symbols in watchlist (Coming soon!)
 
@@ -29,6 +31,9 @@ Chrome extension to provide stock watchlist for trading view website.
 11. You are ready to use the watchlist. Add stocks by clicking on the '+' symbol at the top, and create new watchlist by clicking on 'Create new' button in the watchlist dropdown.
     <img width="200" alt="image" src="https://github.com/RHarshith/Trading-View-Watchlist/assets/43510025/00abedfa-347a-49d7-b12f-dd6fcbb0910f">
 
+12. Navigate between stocks using up/down arrow keys or by clicking on the stocks.
+13. Delete stocks or watchlist by clicking on the 'x' button that appears when you hover over a stock or watchlist.
+14. Use 1,2,3 keyboard keys to bookmark stocks in 3 colors.
 
 \* There are no limits set on number of watchlists or symbols per watchlist, but there is an internal limit on amount of storage a chrome extension can use, which is 10MB.
   Read more on this [here](https://developer.chrome.com/docs/extensions/reference/storage/#property-local)
